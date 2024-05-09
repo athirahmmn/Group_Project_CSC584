@@ -1,0 +1,607 @@
+<?php
+
+include 'dbconn.php'; // Include the database connection script
+
+// Check if the user is logged in
+if(!isset($_SESSION['userID'])) {
+    // Redirect the user to the login page or handle the authentication process
+    header("Location: login.php");
+    exit();
+}
+
+// Check if the form is submitted
+if(isset($_POST['Submit_Button'])) {
+    // Extract form data
+    $recipeName = $_POST['recipeName'];
+    $recipeDescription = $_POST['recipeDescription'];
+    $servings = $_POST['servings'];
+    $category = $_POST['categories'];
+    $ingredientNames = $_POST['ingredientName'];
+    $ingredientQuantities = $_POST['ingredientQuantity'];
+    $instructionSteps = $_POST['instructionStep'];
+
+    // Get the userID of the logged-in user
+    $userID = $_SESSION['userID'];
+
+
+    if (!empty($_FILES["myFile"])) {
+        $targetDir = "uploads/";
+        $targetFile = $targetDir . basename($_FILES["myFile"]["name"]);
+        $uploadOk = 1;
+        $fileType = strtolower(pathinfo($targetFile,PATHINFO_EXTENSION));
+
+        // Check if image file
+        if(isset($_POST["checkImage"]) && $_POST["checkImage"] == "on") {
+            $check = getimagesize($_FILES["myFile"]["tmp_name"]);
+            if($check !== false) {
+                echo "File is an image - " . $check["mime"] . ".";
+                $uploadOk = 1;
+            } else {
+                echo "File is not an image.";
+                $uploadOk = 0;
+            }
+        }
+
+        // Check if file already exists
+        if (file_exists($targetFile)) {
+            echo "Sorry, file already exists.";
+            $uploadOk = 0;
+        }
+
+        // Check file size (optional, adjust limit as needed)
+        if ($_FILES["myFile"]["size"] > 500000) {
+            echo "Sorry, your file is too large.";
+            $uploadOk = 0;
+        }
+
+        // Allow certain file formats (optional, adjust as needed)
+        if($fileType != "jpg" && $fileType != "png" && $fileType != "jpeg"
+            && $fileType != "gif" ) {
+            echo "Sorry, only JPG, JPEG, PNG & GIF files are allowed.";
+            $uploadOk = 0;
+        }
+
+        // If everything is OK, try to upload file
+        if ($uploadOk == 1) {
+            if (move_uploaded_file($_FILES["myFile"]["tmp_name"], $targetFile)) {
+                echo "The file ". basename( $_FILES["myFile"]["name"]). " has been uploaded.";
+            } else {
+                echo "Sorry, there was an error uploading your file.";
+            }
+        }
+    } 
+    else {
+        echo "Sorry, no file selected.";
+    }
+
+    // Insert into recipes table
+    $insertRecipeQuery = "INSERT INTO recipes (userID, recipeName, recipeDescription, category, servings) VALUES ($userID, '$recipeName', '$recipeDescription','$category', $servings)";
+    mysqli_query($connect, $insertRecipeQuery);
+
+    // Get the recipeID of the inserted recipe
+    $recipeID = mysqli_insert_id($connect);
+
+    // Insert ingredients into ingredients table
+    foreach($ingredientNames as $key => $ingredientName) {
+        // Ensure the key exists in $ingredientQuantities
+        if(isset($ingredientQuantities[$key])) {
+            $ingredientQuantity = $ingredientQuantities[$key];
+            $insertIngredientQuery = "INSERT INTO ingredients (recipeID, ingredientName, quantity) VALUES ($recipeID, '$ingredientName', '$ingredientQuantity')";
+            mysqli_query($connect, $insertIngredientQuery);
+        }
+    }
+
+// Insert instructions into instructions table
+foreach($instructionSteps as $stepNumber => $instructionStep) {
+    $stepNumber++; // Increment to start from 1
+    $insertInstructionQuery = "INSERT INTO instructions (recipeID, instructionStep, stepNumber) VALUES ($recipeID, '$instructionStep', $stepNumber)";
+    mysqli_query($connect, $insertInstructionQuery);
+}
+    // Redirect to a success page or do something else
+    header("Location: browseRecipe.html");
+    exit();
+}
+?>
+
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Healthy Meal Plans</title>
+  <style>
+    /* Basic reset styles */
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: sans-serif;
+      background: linear-gradient(to right, #f7cac9, #dec2cb, #c5b9cd, #abb1cf, #92a8d1);
+    }
+
+    /* Header styling */
+    .header { /* A light blue color */
+      color: white;
+      padding: 20px 0;
+      text-align: center;
+    }
+
+    /* Navigation bar styling */
+    .nav { /* Same light blue as header */
+      color: white;
+      padding: 10px 0;
+      text-align: right;
+    }
+
+    .nav ul {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .nav li {
+      display: inline-block;
+      padding: 10px 20px;
+    }
+
+    .nav a {
+      color: white;
+      text-decoration: none;
+      text-align: left;
+    }
+
+    .nav a:hover {
+      color: #296AAE; /* A darker blue color */
+    }
+    .recipe-container {
+        position: relative;
+        width: 1150px; /* Adjust width as needed */
+        height: fit-content;
+        display: flex;
+        margin: 0 auto;
+        padding: 20px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        background-color: #ddd;
+    }
+    .left-side {
+        flex: 1; /* Take up remaining space */
+        margin-top: 12%;
+    }
+
+.recipe-container h2 {
+    position: absolute; /* Position relative to the container */
+    top: 0; /* Position at the top */
+    left: 50%; /* Move to the center horizontally */
+    transform: translateX(-50%); /* Center horizontally */
+    margin-top: 5%;
+}
+
+    .drop-zone__input {
+        display: none;
+    }
+
+    .drop-zone__prompt {
+        margin-top: 20px; /* Adjust as needed */
+        color: #39393a93;
+        font-family: inherit;
+    }
+    .drop-zone__thumb {
+        width: 400px; /* Fixed width */
+        height: 300px; /* Fixed height */
+        border-radius: 10px;
+        overflow: hidden;
+        background-color: #cccccc;
+        background-size: contain; /* Use 'contain' to ensure the entire image fits within the box */
+        background-position: center; /* Center the background image */
+        position: relative;
+    }
+
+    .drop-zone__thumb::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%; /* Full width */
+        height: 100%; /* Full height */
+        border-radius: 10px; /* Same border radius as the container */
+        box-sizing: border-box; /* Include border in dimensions */
+    }
+    .drop-zone {
+    width: 400px;
+    height: 300px;
+    padding: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    font-family: source sans pro;
+    font-weight: 400;
+    font-size: 20px;
+    cursor: pointer;
+    color: #cccccc;
+    border: 2px dashed black;
+    border-radius: 7px;
+    margin-left: 50px;
+}
+.text-container {
+    flex: 1; /* Take up remaining space */
+    margin-top: 12%;
+    padding-left: 12%;
+    width: 600px;
+}
+
+.form-grid {
+    display: grid;
+    grid-gap: 10px; /* Gap between cells */
+}
+
+label {
+    display: block;
+    margin-bottom: 5px;
+}
+
+input[type="text"],
+textarea {
+    width: 100%;
+    padding: 10px;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+}
+
+button {
+    padding: 10px;
+    border-radius: 5px;
+    border: none;
+    background-color: #75aff1;
+    color: #fff;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+button:hover {
+    background-color: #0056b3;
+}
+.button-container {
+    margin-top: 20px; /* Adjust margin as needed */
+    margin-left: 65%;
+}
+.adjustable-text-box {
+    resize: both; /* Allow both horizontal and vertical resizing */
+    font-family: inherit;
+    min-height: 30px; /* Set minimum height */
+    min-width: 100px; /* Set minimum width */
+    max-width: 500px; /* Set maximum width */
+    width: auto; /* Allow automatic width adjustment */
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+.ingredient-class {
+    background-color: #fff;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    resize: both; /* Allow both horizontal and vertical resizing */
+    font-family: inherit;
+    min-width: 100px; /* Set minimum width */
+    min-height: 30px; /* Set minimum height */
+    max-width: 500px; /* Set maximum width */
+    width: auto; /* Allow automatic width adjustment */
+    }
+    h1 {
+      text-align: center;
+    }
+    .form-group {
+      margin-bottom: 20px;
+    }
+    label {
+      display: block;
+      margin-bottom: 5px;
+    }
+    
+    input[type="number"] {
+      width: calc(100% - 120px);
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      box-sizing: border-box;
+    }
+    input[type="submit"] {
+      background-color: #4caf50;
+      color: #fff;
+      padding: 12px 24px; /* Larger padding for bigger button */
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background-color 0.3s ease; /* Add transition for smoother hover effect */
+    }
+    input[type="submit"]:hover {
+      background-color: #333; /* Dark grey color on hover */
+    }
+    .ingredient-group {
+      display: flex;
+      align-items: center;
+      margin-bottom: 10px; /* Add margin between ingredient fields */
+    }
+    .ingredient-group input {
+      margin-right: 10px;
+    }
+    .remove-btn {
+      background-color: #ff6347;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      padding: 6px 10px;
+      cursor: pointer;
+    }
+    .remove-btn:hover {
+      background-color: #ff4837;
+    }
+    .instructions-container {
+        max-width: 500px; /* Adjust the width to be smaller */
+        padding: 20px;
+        background-color: #f9f9f9;
+        border-radius: 8px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    }
+
+h2 {
+  text-align: center;
+}
+
+form {
+  display: flex;
+}
+
+#stepsContainer {
+  margin-bottom: 20px;
+  max-width: 600px;
+}
+
+.step {
+  display: flex;
+  align-items: center; /* Center align items vertically */
+  margin-bottom: 10px;
+}
+
+.step input[type="number"] {
+  flex: 1; /* Adjust width to be smaller */
+  margin-right: 10px;
+}
+
+.step textarea {
+  flex: 8;
+  margin-left: 10px;
+  resize: vertical; /* Allow vertical resizing */
+  min-height: 50px; /* Set a minimum height */
+}
+
+.remove-step-btn {
+  background-color: #f44336; /* Red color for remove button */
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  padding: 6px 12px; /* Adjust padding */
+  margin-left: 10px; /* Add margin */
+}
+
+.remove-step-btn:hover {
+  background-color: #d32f2f; /* Darker red color on hover */
+}
+
+/* Styles for step description input */
+.step input[type="text"] {
+  flex: 9; /* Increase the width of the description input */
+  margin-left: 7px; /* Add margin to separate number and description */
+}
+
+/* Styles for specific button */
+.special-button {
+  padding: 10px 20px;
+  cursor: pointer;
+  background-color: #2196f3;
+  color: white;
+  border: none;
+  border-radius: 4px;
+}
+
+/* Styles for submit button */
+button[type="submit"] {
+  background-color: #4caf50;
+}
+
+/* Styles for regular button */
+button[type="button"] {
+  background-color: #2196f3;
+}
+
+.adjustable-dropdown {
+    font-family: inherit;
+    min-height: 30px; /* Set minimum height */
+    min-width: 100px; /* Set minimum width */
+    max-width: 590px; /* Set maximum width */
+    width: auto; /* Allow automatic width adjustment */
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+
+  </style>
+</head>
+<body>
+    <header class="header">
+        <nav class="nav">
+        <div class="container">
+            <ul>
+            <li><a href="homepage.html">Home</a></li>
+            <li><a href="browseRecipe.html">Browse Recipe</a></li>
+            <li><a href="mealPlanner.html">Meal Planner</a></li>
+            <li><a href="profile.html">Profile</a></li>
+            </ul>
+        </div>
+        </nav>
+    </header>
+    <div class="recipe-container">
+        <h2>Insert your recipe description</h2>
+        <form method="POST" action="" enctype="multipart/form-data">
+            <div class="left-side">
+                <div class="drop-zone">
+                    <span class="drop-zone__prompt">Drop your recipe image here or click to upload</span>
+                    <input type="file" name="myFile" class="drop-zone__input">
+                </div>
+            </div>
+
+            <div class="text-container">
+                <div class="form-grid">
+                    <b><label for="recipe-name">Recipe Title:</label></b>
+                    <input type="text" name="recipeName" placeholder="Enter recipe name" rows="1" class="adjustable-text-box" required>
+                    <b><label for="servings">Servings:</label></b>
+                    <input type="text" name="servings" placeholder="Enter servings" rows="1" class="adjustable-text-box" required>
+                    <b><label for="recipe-desc">Recipe Description:</label></b>
+                    <input type="text" name="recipeDescription" placeholder="Enter a short description of your recipe (10 to 12 words)" rows="1" class="adjustable-text-box" required>
+
+                    <b><label for="categories">Categories:</label></b>
+                    <select name="categories" class="adjustable-dropdown" required>
+                        <option value="" disabled selected>Select category</option>
+                        <option value="Breakfast">Breakfast</option>
+                        <option value="Lunch">Lunch</option>
+                        <option value="Snacks">Snacks</option>
+                        <option value="Dinner">Dinner</option>
+                    </select>
+
+                    <b><label for="ingredients">Ingredients:</label></b>
+                    <div class="ingredient-class">
+                        <div class="form-group" id="ingredients-container">
+                            <div class="ingredient-group">
+                                <input type="text" name="ingredientName[]" placeholder="Enter ingredient name...">
+                                <input type="text" name="ingredientQuantity[]" placeholder="Enter ingredient quantity...">
+                                <button type="button" class="remove-btn" onclick="removeIngredientField(this)">Remove</button>
+                            </div>
+                        </div>
+                        <input type="button" value="Add Ingredient" onclick="addIngredientField()" style="background-color: #5e5c5c;"> <!-- Dark grey color -->
+                    </div>
+
+                    <b><label for="instructions">Instructions:</label></b>
+                    <div class="instructions-container">
+                            <div id="stepsContainer">
+                            </div>
+                            <input type="button" value="Add Instructions" style="background-color: #5e5c5c;" onclick="addStep()">
+                    </div>
+                </div></br>
+                <button type="submit" name="Submit_Button" class="button-container">Submit</button>
+            </div>
+        </form>
+    </div>    
+    <script src="dropImage.js"></script>
+
+    <script>
+        function addIngredientField() {
+          const container = document.getElementById("ingredients-container");
+          const newInputGroup = document.createElement("div");
+          newInputGroup.classList.add("ingredient-group");
+          newInputGroup.innerHTML = `
+            <input type="text" name="ingredientName[]" placeholder="Enter ingredient name...">
+            <input type="text" name="ingredientQuantity[]" placeholder="Enter ingredient quantity...">
+            <button type="button" class="remove-btn" onclick="removeIngredientField(this)">Remove</button>
+          `;
+          container.appendChild(newInputGroup);
+        }
+    
+        function removeIngredientField(btn) {
+          const container = document.getElementById("ingredients-container");
+          const ingredientGroup = btn.parentElement;
+          container.removeChild(ingredientGroup);
+        }
+
+        // Initialize stepNumber to 1
+  let stepNumber = 1;
+
+window.onload = function() {
+  if (localStorage.getItem('hasStep') === null) {
+    addStep(); // Add a default step if none exist
+    localStorage.setItem('hasStep', true); // Store a flag in Local Storage
+  }
+}
+
+// Function to add a new step
+function addStep() {
+        const stepsContainer = document.getElementById('stepsContainer');
+        const stepDiv = document.createElement('div');
+        stepDiv.classList.add('step');
+
+        const stepNumberInput = document.createElement('input');
+        stepNumberInput.type = 'number';
+        stepNumberInput.value = stepNumber;
+        stepNumberInput.disabled = true;
+        stepDiv.appendChild(stepNumberInput);
+
+        const stepDescriptionTextarea = document.createElement('textarea');
+        stepDescriptionTextarea.name = 'instructionStep[]'; // Set the name attribute
+        stepDescriptionTextarea.placeholder = 'Enter step description';
+        stepDescriptionTextarea.addEventListener('input', function() {
+            autoAdjustRows(this);
+        });
+        stepDiv.appendChild(stepDescriptionTextarea);
+
+        const removeStepBtn = document.createElement('button');
+        removeStepBtn.type = 'button';
+        removeStepBtn.classList.add('remove-btn');
+        removeStepBtn.textContent = 'Remove';
+        removeStepBtn.addEventListener('click', function() {
+            stepDiv.remove();
+            renumberSteps();
+        });
+        stepDiv.appendChild(removeStepBtn);
+
+        stepsContainer.appendChild(stepDiv);
+
+        stepNumber++;
+    }
+
+    // Function to renumber steps when a step is removed
+    function renumberSteps() {
+        const steps = document.querySelectorAll('.step input[type="number"]');
+        steps.forEach((step, index) => {
+            step.value = index + 1;
+        });
+    }
+
+    // Function to automatically adjust textarea height based on content
+    function autoAdjustRows(textarea) {
+        textarea.style.height = 'auto';
+        textarea.style.height = textarea.scrollHeight + 'px';
+    }
+
+    // Function to remove an ingredient field
+    function removeIngredientField(btn) {
+        const container = document.getElementById("ingredients-container");
+        const ingredientGroup = btn.parentElement;
+        container.removeChild(ingredientGroup);
+    }
+
+    // Function to add an ingredient field
+    function addIngredientField() {
+        const container = document.getElementById("ingredients-container");
+        const newInputGroup = document.createElement("div");
+        newInputGroup.classList.add("ingredient-group");
+        newInputGroup.innerHTML = `
+            <input type="text" name="ingredientName[]" placeholder="Enter ingredient name...">
+            <input type="text" name="ingredientQuantity[]" placeholder="Enter ingredient quantity...">
+            <button type="button" class="remove-btn" onclick="removeIngredientField(this)">Remove</button>
+        `;
+        container.appendChild(newInputGroup);
+    }
+
+    // Ensure that at least one step is added on page load
+    window.onload = function() {
+        if (localStorage.getItem('hasStep') === null) {
+            addStep(); // Add a default step if none exist
+            localStorage.setItem('hasStep', true); // Store a flag in Local Storage
+        }
+    }
+</script>
+    
+</body>
+

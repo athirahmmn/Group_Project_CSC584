@@ -1,0 +1,84 @@
+
+    .image-upload,
+    .text-input {
+        flex: 1; /* Make image and text boxes take up equal space */
+    }
+
+    .image-upload {
+        text-align: center;
+    }
+
+    .image-upload input[type="file"] {
+        display: none; /* Hide the default file input */
+    }
+
+    .image-upload label {
+        cursor: pointer;
+        padding: 10px 20px;
+        border: 1px solid #ccc;
+        border-radius: 3px;
+        background-color: #eee;
+    }
+
+    .text-input {
+        padding: 15px;
+    }
+
+    .text-input textarea {
+        width: 100%;
+        height: 100%; /* Adjust height as needed */
+        border: 1px solid #ccc;
+        border-radius: 3px;
+        padding: 10px;
+        font-family: inherit; /* Inherit font from parent */
+    }
+    .form-group {
+        margin-bottom: 1rem;
+    }
+    .drop-zone {
+        max-width: 310px;
+        height: 200px;
+        padding: 25px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        font-family: source sans pro;
+        font-weight: 400;
+        font-size: 20px;
+        cursor: pointer;
+        color: #cccccc;
+        border: 2px dashed black;
+        border-radius: 7px;
+    }
+
+    .drop-zone--over {
+        border-style: solid;
+    }
+
+    .drop-zone__input {
+        display: none;
+    }
+
+    .drop-zone__thumb {
+        width: 100%;
+        height: 100%;
+        border-radius: 10px;
+        overflow: hidden;
+        background-color: #cccccc;
+        background-size: cover;
+        position: relative;
+    }
+
+    .drop-zone__thumb::after {
+        content: attr(data-label);
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        padding: 5px 0;
+        color: #ffffff;
+        background: rgba(0, 0, 0, 0.75);
+        font-size: 14px;
+        text-align: center;
+    }
